@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# 虚拟环境
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志文件
+*.log
+
+# 操作系统
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 接收的文件
+received_*
+
+# 测试文件
+test_output/
+temp/
+
+# 项目特定的忽略
+*.exe
+*.db
+*.json
+config.ini
+settings.ini
+
+# 调试文件
+debug_*.log
+*.tmp
+*.bak
+*.old
+
+# 打包相关（除了dist目录用于发布）
+build/
+*.manifest
+*.spec
+
+# 临时工作目录
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# 其他
+.DS_Store
+Thumbs.db

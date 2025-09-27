@@ -54,9 +54,13 @@ def on_file_progress(address, received_size, total_size):
     """文件传输进度回调函数"""
     if total_size > 0:
         progress = (received_size / total_size) * 100
-        print(
-            f"\r传输进度: {progress:.1f}% ({received_size}/{total_size} 字节)", end=""
-        )
+        # 区分发送方和接收方的进度更新
+        if address == 1001 and received_size < total_size:  # 发送方的进度更新
+            print(
+                f"\r发送进度: {progress:.1f}% ({received_size}/{total_size} 字节)              ")
+        else:  # 接收方的进度更新
+            print(
+                f"\r接收进度: {progress:.1f}% ({received_size}/{total_size} 字节)              ")
 
 
 def on_node_discovered(address):
@@ -81,19 +85,19 @@ def init_managers():
     manager2.on_node_discovered = on_node_discovered
 
     # 连接串口
-    print("正在连接串口COM16...")
-    is_manager1_connected = manager1.connect("COM16")
+    print("正在连接串口COM18...")
+    is_manager1_connected = manager1.connect("COM18")
     if is_manager1_connected:
-        print("COM16连接成功!")
+        print("COM18连接成功!")
     else:
-        print("COM16连接失败!")
+        print("COM18连接失败!")
 
-    print("正在连接串口COM17...")
-    is_manager2_connected = manager2.connect("COM17")
+    print("正在连接串口COM19...")
+    is_manager2_connected = manager2.connect("COM19")
     if is_manager2_connected:
-        print("COM17连接成功!")
+        print("COM19连接成功!")
     else:
-        print("COM17连接失败!")
+        print("COM19连接失败!")
 
 
 def discover_nodes():
@@ -113,8 +117,8 @@ def discover_nodes():
     manager1_nodes = manager1.get_discovered_nodes()
     manager2_nodes = manager2.get_discovered_nodes()
 
-    print(f"COM16发现的节点: {manager1_nodes}")
-    print(f"COM17发现的节点: {manager2_nodes}")
+    print(f"COM18发现的节点: {manager1_nodes}")
+    print(f"COM19发现的节点: {manager2_nodes}")
 
     return len(manager1_nodes) > 0 and len(manager2_nodes) > 0
 
@@ -131,9 +135,9 @@ def pair_nodes():
     if 1002 in manager1_nodes:
         success = manager1.request_pair(1002, "test123")  # 使用正确的方法和密码
         if success:
-            print("COM16已发送配对请求到COM17")
+            print("COM18已发送配对请求到COM19")
         else:
-            print("COM16发送配对请求失败")
+            print("COM18发送配对请求失败")
 
     # 等待配对完成
     time.sleep(3)  # 增加等待时间确保配对流程完成
@@ -142,8 +146,8 @@ def pair_nodes():
     is_paired1 = manager1.is_node_paired(1002)
     is_paired2 = manager2.is_node_paired(1001)
 
-    print(f"COM16与COM17配对状态: {is_paired1}")
-    print(f"COM17与COM16配对状态: {is_paired2}")
+    print(f"COM18与COM19配对状态: {is_paired1}")
+    print(f"COM19与COM18配对状态: {is_paired2}")
 
     return is_paired1 and is_paired2
 

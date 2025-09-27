@@ -514,7 +514,40 @@ class SerialCommGUI:
             messagebox.showwarning("警告", "请选择有效的文件")
             return
 
-        if self.serial_manager.send_file(node_address, file_path):
+        # 在单独的线程中执行文件传输，避免阻塞GUI主线程
+        def do_send_file():
+            try:
+                success = self.serial_manager.send_file(node_address, file_path)
+                
+                # 使用after在GUI线程中更新UI
+                self.root.after(0, lambda: self._handle_file_send_result(success, node_address, file_path))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("错误", f"发送文件时发生异常: {str(e)}"))
+            finally:
+                # 确保UI状态更新
+                self.root.after(0, lambda: self.enable_ui())
+        
+        # 禁用UI，防止用户在传输过程中进行其他操作
+        self.disable_ui()
+        
+        # 启动新线程执行文件传输
+        thread = threading.Thread(target=do_send_file)
+        thread.daemon = True  # 设置为守护线程，主程序退出时自动结束
+        thread.start()
+        
+    def disable_ui(self):
+        """禁用UI组件，防止在文件传输过程中进行其他操作"""
+        self.connect_btn.config(state=tk.DISABLED)
+        self.node_listbox.config(state=tk.DISABLED)
+    
+    def enable_ui(self):
+        """启用UI组件"""
+        self.connect_btn.config(state=tk.NORMAL)
+        self.node_listbox.config(state=tk.NORMAL)
+    
+    def _handle_file_send_result(self, success, node_address, file_path):
+        """处理文件发送结果，在GUI线程中调用"""
+        if success:
             filename = os.path.basename(file_path)
             self.message_text.insert(
                 tk.END, f"我 -> {node_address}: 发送文件 {filename}\n"
@@ -557,24 +590,30 @@ class SerialCommGUI:
                 progress = (received_size / total_size) * 100
                 self.file_progress["value"] = progress
 
+                # 区分发送方和接收方
+                is_sending = False
+                if hasattr(self, 'serial_manager') and self.serial_manager:
+                    is_sending = from_address == self.serial_manager.address
+
                 if received_size >= total_size:
                     self.file_progress_label.config(text="传输完成")
-                    # 2秒后重置进度条
-                    self.root.after(
-                        2000,
-                        lambda: [
-                            self.file_progress.config(value=0),
-                            self.file_progress_label.config(text="准备就绪"),
-                        ],
-                    )
+                    # 2秒后重置进度条，使用单独的方法而不是列表推导式
+                    self.root.after(2000, self.reset_progress_bar)
                 else:
-                    self.file_progress_label.config(
-                        text=f"接收中: {received_size}/{total_size} 字节 ({progress:.1f}%)"
-                    )
+                    if is_sending:
+                        status_text = f"发送中: {received_size}/{total_size} 字节 ({progress:.1f}%)"
+                    else:
+                        status_text = f"接收中: {received_size}/{total_size} 字节 ({progress:.1f}%)"
+                    self.file_progress_label.config(text=status_text)
             else:
                 self.file_progress_label.config(text="准备就绪")
 
         self.root.after(0, update_progress)
+        
+    def reset_progress_bar(self):
+        """重置进度条和标签"""
+        self.file_progress.config(value=0)
+        self.file_progress_label.config(text="准备就绪")
 
     def show_about(self):
         """显示关于对话框"""

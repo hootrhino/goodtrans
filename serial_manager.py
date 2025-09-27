@@ -192,9 +192,36 @@ class SerialManager:
         )
         
         try:
-            self.serial_port.write(packet)
+            # 保存原始超时设置
+            original_timeout = self.serial_port.timeout
+            # 临时增加超时时间
+            self.serial_port.timeout = 3
+            
+            # 添加重试机制
+            max_retries = 3
+            retry_count = 0
+            success = False
+            
+            while retry_count < max_retries and not success:
+                try:
+                    self.serial_port.write(packet)
+                    success = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print(f"广播发现失败: {e}")
+                    else:
+                        print(f"广播发现失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                    time.sleep(0.5)  # 重试前等待一小段时间
+            
+            # 恢复原始超时设置
+            self.serial_port.timeout = original_timeout
+            
         except Exception as e:
             print(f"广播发现失败: {e}")
+            # 确保恢复原始超时设置
+            if hasattr(self, 'serial_port') and hasattr(self.serial_port, 'timeout') and 'original_timeout' in locals():
+                self.serial_port.timeout = original_timeout
     
     def _handle_discover(self, packet):
         """处理节点发现"""
@@ -209,10 +236,36 @@ class SerialManager:
                 {'address': self.address, 'verify_code': str(self.verify_code)}
             )
             
-            self.serial_port.write(response)
+            # 保存原始超时设置
+            original_timeout = self.serial_port.timeout
+            # 临时增加超时时间
+            self.serial_port.timeout = 3
+            
+            # 添加重试机制
+            max_retries = 3
+            retry_count = 0
+            success = False
+            
+            while retry_count < max_retries and not success:
+                try:
+                    self.serial_port.write(response)
+                    success = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print(f"处理发现消息错误: {e}")
+                    else:
+                        print(f"处理发现消息失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                    time.sleep(0.5)  # 重试前等待一小段时间
+            
+            # 恢复原始超时设置
+            self.serial_port.timeout = original_timeout
             
         except Exception as e:
             print(f"处理发现消息错误: {e}")
+            # 确保恢复原始超时设置
+            if hasattr(self, 'serial_port') and hasattr(self.serial_port, 'timeout') and 'original_timeout' in locals():
+                self.serial_port.timeout = original_timeout
     
     def _handle_discover_ack(self, packet):
         """处理发现响应"""
@@ -269,11 +322,44 @@ class SerialManager:
                 pair_data
             )
             
-            self.serial_port.write(packet)
-            return True
+            # 保存原始超时设置
+            original_timeout = self.serial_port.timeout
+            # 临时增加超时时间
+            self.serial_port.timeout = 3
+            
+            # 添加重试机制
+            max_retries = 3
+            retry_count = 0
+            success = False
+            
+            while retry_count < max_retries and not success:
+                try:
+                    self.serial_port.write(packet)
+                    success = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print(f"发送配对请求失败: {e}")
+                        # 如果重试失败，清理待处理请求
+                        if target_address in self.pending_pairs:
+                            del self.pending_pairs[target_address]
+                        return False
+                    print(f"发送配对请求失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                    time.sleep(0.5)
+            
+            # 恢复原始超时设置
+            self.serial_port.timeout = original_timeout
+            
+            return success
             
         except Exception as e:
             print(f"发送配对请求失败: {e}")
+            # 确保清理待处理请求
+            if target_address in self.pending_pairs:
+                del self.pending_pairs[target_address]
+            # 确保恢复原始超时设置
+            if hasattr(self, 'serial_port') and hasattr(self.serial_port, 'timeout') and 'original_timeout' in locals():
+                self.serial_port.timeout = original_timeout
             return False
     
     def _handle_pair_request(self, packet):
@@ -448,11 +534,55 @@ class SerialManager:
                 text
             )
             
-            self.serial_port.write(packet)
-            return True
+            # 保存原始超时设置
+            original_timeout = self.serial_port.timeout
+            # 临时增加超时时间
+            self.serial_port.timeout = 3
+            
+            # 添加重试机制
+            max_retries = 3
+            retry_count = 0
+            success = False
+            
+            while retry_count < max_retries and not success:
+                try:
+                    self.serial_port.write(packet)
+                    success = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print(f"发送文本失败: {e}")
+                        return False
+                    print(f"发送文本失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                    time.sleep(0.5)
+            
+            # 恢复原始超时设置
+            self.serial_port.timeout = original_timeout
+            
+            return success
         except Exception as e:
             print(f"发送文本失败: {e}")
+            # 确保恢复原始超时设置
+            if hasattr(self, 'serial_port') and hasattr(self.serial_port, 'timeout') and 'original_timeout' in locals():
+                self.serial_port.timeout = original_timeout
             return False
+    
+    def _calculate_write_timeout(self, file_size):
+        """根据文件大小计算合适的写超时时间
+        - 小文件(<100KB): 5秒
+        - 中等文件(100KB-1MB): 10秒
+        - 大文件(1MB-10MB): 20秒
+        - 超大文件(>10MB): 30秒
+        增加超时时间以提高稳定性，特别是在GUI环境下
+        """
+        if file_size < 100 * 1024:  # <100KB
+            return 5
+        elif file_size < 1024 * 1024:  # <1MB
+            return 10
+        elif file_size < 10 * 1024 * 1024:  # <10MB
+            return 20
+        else:  # >=10MB
+            return 30
     
     def send_file(self, target_address, file_path):
         """发送文件（检查配对状态）"""
@@ -463,9 +593,21 @@ class SerialManager:
             print(f"节点 {target_address} 未配对，无法发送文件")
             return False
         
+        original_timeout = None
         try:
             file_name = os.path.basename(file_path)
             file_size = os.path.getsize(file_path)
+            
+            # 保存原始超时设置
+            original_timeout = self.serial_port.timeout
+            # 根据文件大小设置新的超时时间
+            new_timeout = self._calculate_write_timeout(file_size)
+            self.serial_port.timeout = new_timeout
+            
+            # 根据文件大小调整发送参数
+            chunk_size = 1024
+            if file_size > 5 * 1024 * 1024:  # >5MB
+                chunk_size = 4096  # 大文件使用更大的数据块
             
             # 发送文件开始消息
             start_data = {
@@ -479,10 +621,25 @@ class SerialManager:
                 start_data
             )
             
-            self.serial_port.write(packet)
+            # 添加重试机制
+            max_retries = 3
+            retry_count = 0
+            success = False
+            
+            while retry_count < max_retries and not success:
+                try:
+                    self.serial_port.write(packet)
+                    success = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print(f"发送文件开始消息失败: {e}")
+                        return False
+                    print(f"发送失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                    time.sleep(0.5)  # 重试前等待一小段时间
             
             # 发送文件数据
-            chunk_size = 1024
+            sent_bytes = 0
             with open(file_path, 'rb') as f:
                 while True:
                     chunk = f.read(chunk_size)
@@ -495,8 +652,32 @@ class SerialManager:
                         chunk
                     )
                     
-                    self.serial_port.write(packet)
-                    time.sleep(0.01)
+                    retry_count = 0
+                    success = False
+                    while retry_count < max_retries and not success:
+                        try:
+                            self.serial_port.write(packet)
+                            success = True
+                        except Exception as e:
+                            retry_count += 1
+                            if retry_count >= max_retries:
+                                print(f"发送文件数据失败: {e}")
+                                return False
+                            print(f"发送失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                            time.sleep(0.5)
+                    
+                    if success:
+                        sent_bytes += len(chunk)
+                        
+                        # 发送进度回调 - 传递发送方自己的地址作为第一个参数，便于区分发送和接收
+                        if self.on_file_progress:
+                            self.on_file_progress(self.address, sent_bytes, file_size)
+                        
+                        # 根据文件大小调整发送间隔
+                        if file_size > 10 * 1024 * 1024:  # >10MB
+                            time.sleep(0.005)  # 大文件使用更小的间隔
+                        else:
+                            time.sleep(0.01)
             
             # 发送文件结束消息
             packet = self.protocol.create_packet(
@@ -505,12 +686,38 @@ class SerialManager:
                 {'file_name': file_name}
             )
             
-            self.serial_port.write(packet)
-            return True
+            retry_count = 0
+            success = False
+            while retry_count < max_retries and not success:
+                try:
+                    self.serial_port.write(packet)
+                    success = True
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print(f"发送文件结束消息失败: {e}")
+                        return False
+                    print(f"发送失败，正在重试 ({retry_count}/{max_retries}): {e}")
+                    time.sleep(0.5)
             
+            # 恢复原始超时设置
+            self.serial_port.timeout = original_timeout
+            
+            # 确保目标节点在发现列表中保持活跃
+            if target_address in self.discovered_nodes:
+                self.discovered_nodes[target_address]['last_seen'] = time.time()
+            
+            return True
         except Exception as e:
             print(f"发送文件失败: {e}")
             return False
+        finally:
+            # 确保恢复原始超时设置，无论发生什么异常
+            if original_timeout is not None and hasattr(self, 'serial_port') and hasattr(self.serial_port, 'timeout'):
+                try:
+                    self.serial_port.timeout = original_timeout
+                except Exception as e:
+                    print(f"恢复原始超时设置失败: {e}")
     
     def _handle_file_start(self, packet):
         """处理文件传输开始"""
@@ -545,6 +752,10 @@ class SerialManager:
         file_info = self.file_receive_buffer[packet['address']]
         file_info['data'] += packet['payload']
         file_info['received_size'] += len(packet['payload'])
+        
+        # 确保发送方节点在发现列表中保持活跃
+        if packet['address'] in self.discovered_nodes:
+            self.discovered_nodes[packet['address']]['last_seen'] = time.time()
         
         if self.on_file_progress:
             progress = (file_info['received_size'] / file_info['file_size']) * 100

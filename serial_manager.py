@@ -28,6 +28,7 @@ class SerialManager:
         self.on_text_received = None
         self.on_file_received = None
         self.on_node_discovered = None
+        self.on_file_progress = None
         
         # 节点列表
         self.discovered_nodes = {}
